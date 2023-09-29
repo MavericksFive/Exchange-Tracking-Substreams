@@ -67,7 +67,7 @@ The deploy script will change if you are deploying to the hosted service or dece
 ```mermaid
 graph TD;
   map_exchange[map: map_exchange];
-  sf.ethereum.type.v2.Block[source: sf.ethereum.type.v2.Block] --> map_exchang;
+  sf.ethereum.type.v2.Block[source: sf.ethereum.type.v2.Block] --> map_exchange;
   store_pool[store: store_pool];
   sf.ethereum.type.v2.Block[source: sf.ethereum.type.v2.Block] --> store_pool;
   graph_out[map: graph_out];
