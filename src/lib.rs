@@ -12,7 +12,7 @@ use utils::math::to_big_decimal;
 use substreams_entity_change::{pb::entity::EntityChanges, tables::Tables};
 
 use utils::constants::{CONTRACT_ADDRESS, START_BLOCK};
-use utils::helpers::{append_0x, generate_id};
+use utils::helpers::{append_0x};
 substreams_ethereum::init!();
 
 /// Extracts token exchanges events from the pool contract
@@ -26,19 +26,15 @@ fn map_exchanges(blk: eth::Block) -> Result<Option<StableSwap::Exchanges>, subst
             StableSwap::Exchange {
                 buyer: Some(StableSwap::Account {
                     address: append_0x(Hex::encode(&exchange.buyer).to_string().as_str()),}),
-                sold_id: to_big_decimal(&exchange.sold_id.to_string().as_str())
-                .unwrap()
-                .to_string(),
+                sold_id: ((&exchange.sold_id).to_string()).to_string(),
                 tokens_sold: to_big_decimal(&exchange.tokens_sold.to_string().as_str())
                 .unwrap()
                 .to_string(),
-                bought_id: to_big_decimal(&exchange.bought_id.to_string().as_str())
-                .unwrap()
-                .to_string(),
+                bought_id: ((&exchange.bought_id).to_string()).to_string(),
                 tokens_bought: to_big_decimal(&exchange.tokens_bought.to_string().as_str())
                 .unwrap()
                 .to_string(),
-                trx_hash: Hex::encode(&log.receipt.transaction.hash),
+                trx_hash: append_0x(&Hex::encode(&log.receipt.transaction.hash)),
                 block_number: blk.number,
                 timestamp: blk.timestamp_seconds(),
                 log_index: log.index()
@@ -51,8 +47,6 @@ fn map_exchanges(blk: eth::Block) -> Result<Option<StableSwap::Exchanges>, subst
 
     Ok(Some(StableSwap::Exchanges { exchanges }))
 }
-
-const NULL_ADDRESS: &str = "0000000000000000000000000000000000000000";
 
 /// Store the total balance of NFT tokens for the specific CONTRACT_ADDRESS by holder
 #[substreams::handlers::store]
