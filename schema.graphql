@@ -1,11 +1,11 @@
 type Account @entity {
   id: ID!
-  buyer: [Exchange!]! @derivedFrom(field: "buyer")
+  exchanges: [Exchange!]! @derivedFrom(field: "buyer")
 }
 
 type Exchange @entity(immutable: true) {
   id: ID!
-  buyer: Account
+  buyer: Account!
   sold_id: String!
   tokens_sold: String!
   bought_id: String!
@@ -14,6 +14,7 @@ type Exchange @entity(immutable: true) {
   timestamp: BigInt!
   block_number: BigInt!
   log_index: BigInt!
+  pool: Pool!
 }
 
 type Pool @entity {
@@ -23,4 +24,5 @@ type Pool @entity {
   address_token_one: String!
   address_token_two: String!
   address_token_three: String!
+  exchanges: [Exchange!]! @derivedFrom(field: "pool")
 }

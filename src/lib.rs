@@ -2,19 +2,17 @@ mod abi;
 mod pb;
 mod utils;
 
-use hex_literal::hex;
 use pb::eth::stable_swap::v1 as StableSwap;
 use substreams::pb::substreams::store_delta::Operation;
-use substreams::{key, prelude::*};
-use substreams::{log, store::{StoreSetProto, Deltas}, Hex};
+use substreams::prelude::*;
+use substreams::{store::{StoreSetProto, Deltas}, Hex};
 use substreams_ethereum::pb::sf::ethereum::r#type::v2 as eth;
 use utils::math::to_big_decimal;
 
 use substreams_entity_change::{pb::entity::EntityChanges, tables::Tables};
 
 use utils::constants::{CONTRACT_ADDRESS, START_BLOCK};
-
-
+use utils::helpers::{append_0x, generate_id};
 substreams_ethereum::init!();
 
 /// Extracts token exchanges events from the pool contract
@@ -27,7 +25,7 @@ fn map_exchanges(blk: eth::Block) -> Result<Option<StableSwap::Exchanges>, subst
 
             StableSwap::Exchange {
                 buyer: Some(StableSwap::Account {
-                    address: Hex::encode(&exchange.buyer).to_string(),}),
+                    address: append_0x(Hex::encode(&exchange.buyer).to_string().as_str()),}),
                 sold_id: to_big_decimal(&exchange.sold_id.to_string().as_str())
                 .unwrap()
                 .to_string(),
@@ -69,28 +67,34 @@ fn store_pool(block: eth::Block, o: StoreSetProto<StableSwap::Pool>) {
         };
         o.set(0, format!("Pool: {}", pool.pool_address), &pool);
     };
+}
 
-}#[substreams::handlers::map]
+#[substreams::handlers::map]
 fn graph_out(
     exchanges: StableSwap::Exchanges,
     pools: Deltas<DeltaProto<StableSwap::Pool>>,
 ) -> Result<EntityChanges, substreams::errors::Error> {
     let mut tables = Tables::new();
     for exchange in exchanges.exchanges {
+        let buyer_address = exchange.buyer.unwrap().address.clone();
         tables
             .create_row(
                 "Exchange",
                 format!("{}", &exchange.trx_hash),
             )
-            .set("buyer", exchange.buyer.unwrap().address)
-            .set("sold_id", exchange.sold_id)
-            .set("tokens_sold", exchange.tokens_sold)
-            .set("bought_id", exchange.bought_id)
-            .set("tokens_bought", exchange.tokens_bought)
-            .set("trx_hash", exchange.trx_hash)
+            .set("buyer", &buyer_address)
+            .set("sold_id", &exchange.sold_id)
+            .set("tokens_sold", &exchange.tokens_sold)
+            .set("bought_id", &exchange.bought_id)
+            .set("tokens_bought", &exchange.tokens_bought)
+            .set("trx_hash", &exchange.trx_hash)
             .set("timestamp", exchange.timestamp)
             .set("block_number", exchange.block_number)
-            .set("log_index", exchange.log_index);
+            .set("log_index", exchange.log_index)
+            .set("pool", append_0x(Hex::encode(CONTRACT_ADDRESS).to_string().as_str()));
+
+            //handles accounts
+            tables.create_row("Account", &buyer_address);
 
     }
 
@@ -106,13 +110,9 @@ fn graph_out(
             }
             Operation::Update => todo!(),
             Operation::Delete => todo!(),
-            x => panic!("unsupported opeation {:?}", x),
+            x => panic!("unsupported operation {:?}", x),
         };
     }
 
     Ok(tables.to_entity_changes())
-}
-
-fn generate_key(holder: &String) -> String {
-    return format!("total:{}:{}", holder, Hex(CONTRACT_ADDRESS));
 }

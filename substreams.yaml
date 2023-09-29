@@ -26,14 +26,6 @@ modules:
     output:
       type: proto:eth.stableSwap.v1.Exchanges
 
-  # - name: store_exchanges
-  #   kind: store
-  #   initialBlock: 12287507
-  #   updatePolicy: add
-  #   valueType: int64
-  #   inputs:
-  #     - map: map_exchanges
-
   - name: store_pool
     kind: store
     initialBlock: 10276641
@@ -47,8 +39,6 @@ modules:
     initialBlock: 10276641
     inputs:
       - map: map_exchanges
-      # - store: store_exchanges
-      #   mode: deltas
       - store: store_pool
         mode: deltas
     output:
