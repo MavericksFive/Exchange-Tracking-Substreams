@@ -1,0 +1,26 @@
+type Account @entity {
+  id: ID!
+  buyer: [Exchange!]! @derivedFrom(field: "buyer")
+}
+
+type Exchange @entity(immutable: true) {
+  id: ID!
+  buyer: Account
+  sold_id: String!
+  tokens_sold: String!
+  bought_id: String!
+  tokens_bought: String!
+  trx_hash: String!
+  timestamp: BigInt!
+  block_number: BigInt!
+  log_index: BigInt!
+}
+
+type Pool @entity {
+  id: ID!
+  name: String!
+  pool_address: String!
+  address_token_one: String!
+  address_token_two: String!
+  address_token_three: String!
+}

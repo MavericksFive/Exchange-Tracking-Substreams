@@ -1,96 +1,118 @@
 mod abi;
 mod pb;
-use hex_literal::hex;
-use pb::eth::erc721::v1 as erc721;
-use substreams::{key, prelude::*};
-use substreams::{log, store::StoreAddInt64, Hex};
-use substreams_database_change::pb::database::DatabaseChanges;
-use substreams_database_change::tables::Tables;
-use substreams_ethereum::pb::sf::ethereum::r#type::v2 as eth;
+mod utils;
 
-// Bored Ape Club Contract
-const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
+use hex_literal::hex;
+use pb::eth::stable_swap::v1 as StableSwap;
+use substreams::pb::substreams::store_delta::Operation;
+use substreams::{key, prelude::*};
+use substreams::{log, store::{StoreSetProto, Deltas}, Hex};
+use substreams_ethereum::pb::sf::ethereum::r#type::v2 as eth;
+use utils::math::to_big_decimal;
+
+use substreams_entity_change::{pb::entity::EntityChanges, tables::Tables};
+
+use utils::constants::{CONTRACT_ADDRESS, START_BLOCK};
+
 
 substreams_ethereum::init!();
 
-/// Extracts transfers events from the contract
+/// Extracts token exchanges events from the pool contract
 #[substreams::handlers::map]
-fn map_transfers(blk: eth::Block) -> Result<Option<erc721::Transfers>, substreams::errors::Error> {
-    let transfers: Vec<_> = blk
-        .events::<abi::erc721::events::Transfer>(&[&TRACKED_CONTRACT])
-        .map(|(transfer, log)| {
-            substreams::log::info!("NFT Transfer seen");
+fn map_exchanges(blk: eth::Block) -> Result<Option<StableSwap::Exchanges>, substreams::errors::Error> {
+    let exchanges: Vec<_> = blk
+        .events::<abi::stable_swap::events::TokenExchange>(&[&CONTRACT_ADDRESS])
+        .map(|(exchange, log)| {
+            substreams::log::info!("Token Exchange seen");
 
-            erc721::Transfer {
+            StableSwap::Exchange {
+                buyer: Some(StableSwap::Account {
+                    address: Hex::encode(&exchange.buyer).to_string(),}),
+                sold_id: to_big_decimal(&exchange.sold_id.to_string().as_str())
+                .unwrap()
+                .to_string(),
+                tokens_sold: to_big_decimal(&exchange.tokens_sold.to_string().as_str())
+                .unwrap()
+                .to_string(),
+                bought_id: to_big_decimal(&exchange.bought_id.to_string().as_str())
+                .unwrap()
+                .to_string(),
+                tokens_bought: to_big_decimal(&exchange.tokens_bought.to_string().as_str())
+                .unwrap()
+                .to_string(),
                 trx_hash: Hex::encode(&log.receipt.transaction.hash),
-                from: Hex::encode(&transfer.from),
-                to: Hex::encode(&transfer.to),
-                token_id: transfer.token_id.to_u64(),
-                ordinal: log.block_index() as u64,
+                block_number: blk.number,
+                timestamp: blk.timestamp_seconds(),
+                log_index: log.index()
             }
         })
         .collect();
-    if transfers.len() == 0 {
+    if exchanges.len() == 0 {
         return Ok(None);
     }
 
-    Ok(Some(erc721::Transfers { transfers }))
+    Ok(Some(StableSwap::Exchanges { exchanges }))
 }
 
 const NULL_ADDRESS: &str = "0000000000000000000000000000000000000000";
 
-/// Store the total balance of NFT tokens for the specific TRACKED_CONTRACT by holder
+/// Store the total balance of NFT tokens for the specific CONTRACT_ADDRESS by holder
 #[substreams::handlers::store]
-fn store_transfers(transfers: erc721::Transfers, s: StoreAddInt64) {
-    log::info!("NFT holders state builder");
-    for transfer in transfers.transfers {
-        if transfer.from != NULL_ADDRESS {
-            log::info!("Found a transfer out {}", Hex(&transfer.trx_hash));
-            s.add(transfer.ordinal, generate_key(&transfer.from), -1);
-        }
+fn store_pool(block: eth::Block, o: StoreSetProto<StableSwap::Pool>) {
+    if block.number == START_BLOCK {
+        let pool = &StableSwap::Pool {
+            name: "sBTC Swap".to_string(),
+            pool_address: "0x7fC77b5c7614E1533320Ea6DDc2Eb61fa00A9714".to_string(),
+            address_token_one: "0xEB4C2781e4ebA804CE9a9803C67d0893436bB27D".to_string(),
+            address_token_two: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599".to_string(),
+            address_token_three: "0xfE18be6b3Bd88A2D2A7f928d00292E7a9963CfC6".to_string(),
+        };
+        o.set(0, format!("Pool: {}", pool.pool_address), &pool);
+    };
 
-        if transfer.to != NULL_ADDRESS {
-            log::info!("Found a transfer in {}", Hex(&transfer.trx_hash));
-            s.add(transfer.ordinal, generate_key(&transfer.to), 1);
-        }
-    }
-}
-
-#[substreams::handlers::map]
-fn db_out(
-    clock: substreams::pb::substreams::Clock,
-    transfers: erc721::Transfers,
-    owner_deltas: Deltas<DeltaInt64>,
-) -> Result<DatabaseChanges, substreams::errors::Error> {
+}#[substreams::handlers::map]
+fn graph_out(
+    exchanges: StableSwap::Exchanges,
+    pools: Deltas<DeltaProto<StableSwap::Pool>>,
+) -> Result<EntityChanges, substreams::errors::Error> {
     let mut tables = Tables::new();
-    for transfer in transfers.transfers {
+    for exchange in exchanges.exchanges {
         tables
             .create_row(
-                "transfer",
-                format!("{}-{}", &transfer.trx_hash, transfer.ordinal),
+                "Exchange",
+                format!("{}", &exchange.trx_hash),
             )
-            .set("trx_hash", transfer.trx_hash)
-            .set("from", transfer.from)
-            .set("to", transfer.to)
-            .set("token_id", transfer.token_id)
-            .set("ordinal", transfer.ordinal);
+            .set("buyer", exchange.buyer.unwrap().address)
+            .set("sold_id", exchange.sold_id)
+            .set("tokens_sold", exchange.tokens_sold)
+            .set("bought_id", exchange.bought_id)
+            .set("tokens_bought", exchange.tokens_bought)
+            .set("trx_hash", exchange.trx_hash)
+            .set("timestamp", exchange.timestamp)
+            .set("block_number", exchange.block_number)
+            .set("log_index", exchange.log_index);
+
     }
 
-    for delta in owner_deltas.into_iter() {
-        let holder = key::segment_at(&delta.key, 1);
-        let contract = key::segment_at(&delta.key, 2);
-
-        tables
-            .create_row("owner_count", format!("{}-{}", contract, holder))
-            .set("contract", contract)
-            .set("holder", holder)
-            .set("balance", delta.new_value)
-            .set("block_number", clock.number);
+    for delta in pools.deltas {
+        match delta.operation {
+            Operation::Create => {
+                let pool_row = tables.create_row("Pool", &delta.new_value.pool_address);
+                pool_row.set("name", delta.new_value.name);
+                pool_row.set("pool_address", delta.new_value.pool_address);
+                pool_row.set("address_token_one", delta.new_value.address_token_one);
+                pool_row.set("address_token_two", delta.new_value.address_token_two);
+                pool_row.set("address_token_three", delta.new_value.address_token_three);
+            }
+            Operation::Update => todo!(),
+            Operation::Delete => todo!(),
+            x => panic!("unsupported opeation {:?}", x),
+        };
     }
 
-    Ok(tables.to_database_changes())
+    Ok(tables.to_entity_changes())
 }
 
 fn generate_key(holder: &String) -> String {
-    return format!("total:{}:{}", holder, Hex(TRACKED_CONTRACT));
+    return format!("total:{}:{}", holder, Hex(CONTRACT_ADDRESS));
 }

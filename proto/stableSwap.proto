@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package eth.stableSwap.v1;
+
+message Exchanges {
+  repeated Exchange exchanges = 1;
+}
+
+message Exchange {
+  Account buyer = 1;
+  string sold_id = 2;
+  string tokens_sold = 3;
+  string bought_id = 4;
+  string tokens_bought = 5;
+  string trx_hash = 10;
+  uint64 block_number = 11;
+  uint64 timestamp = 12;
+  uint32 log_index = 13;
+}
+
+message Account {
+  string address = 1;
+}
+
+message Pool {
+  string name = 1;
+  string pool_address = 2;
+  string address_token_one = 3;
+  string address_token_two = 4;
+  string address_token_three = 5;
+}
