@@ -1,5 +1,5 @@
 
-# sBTC swap pool Substreams
+# sBTC swap - Curve pool Substreams
 
 Even if this SPS is configured for the sBTC swap pool, you use for each pool by updating the `CONTRACT_ADDRESS`, `START_BLOCK` and the contract metadata in the `store_token` function to match your token.
 
