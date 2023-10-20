@@ -12,7 +12,7 @@ use utils::math::to_big_decimal;
 use substreams_entity_change::{pb::entity::EntityChanges, tables::Tables};
 
 use utils::constants::{CONTRACT_ADDRESS, START_BLOCK};
-use utils::helpers::{append_0x};
+use utils::helpers::{append_0x, decimals_per_token_id};
 substreams_ethereum::init!();
 
 /// Extracts token exchanges events from the pool contract
@@ -22,16 +22,16 @@ fn map_exchanges(blk: eth::Block) -> Result<Option<StableSwap::Exchanges>, subst
         .events::<abi::stable_swap::events::TokenExchange>(&[&CONTRACT_ADDRESS])
         .map(|(exchange, log)| {
             substreams::log::info!("Token Exchange seen");
-
+             
             StableSwap::Exchange {
                 buyer: Some(StableSwap::Account {
                     address: append_0x(Hex::encode(&exchange.buyer).to_string().as_str()),}),
                 sold_id: ((&exchange.sold_id).to_string()).to_string(),
-                tokens_sold: to_big_decimal(&exchange.tokens_sold.to_string().as_str())
+                tokens_sold: to_big_decimal(&exchange.tokens_sold.to_string().as_str(), decimals_per_token_id(&exchange.tokens_sold))
                 .unwrap()
                 .to_string(),
                 bought_id: ((&exchange.bought_id).to_string()).to_string(),
-                tokens_bought: to_big_decimal(&exchange.tokens_bought.to_string().as_str())
+                tokens_bought: to_big_decimal(&exchange.tokens_bought.to_string().as_str(), decimals_per_token_id(&exchange.tokens_bought))
                 .unwrap()
                 .to_string(),
                 trx_hash: append_0x(&Hex::encode(&log.receipt.transaction.hash)),

@@ -33,10 +33,10 @@ pub fn divide_by_decimals(big_float_amount: BigDecimal, decimals: u64) -> BigDec
     big_float_amount.div(bd).with_prec(10)
 }
 
-pub fn to_big_decimal(price_str: &str) -> Result<BigDecimal, ParseBigDecimalError> {
+pub fn to_big_decimal(price_str: &str, decimals: u64) -> Result<BigDecimal, ParseBigDecimalError> {
     let val = BigDecimal::from_str(price_str);
     if val.is_ok() {
-        let new_val = divide_by_decimals(val.unwrap(), 18);
+        let new_val = divide_by_decimals(val.unwrap(), decimals);
         Ok(new_val)
     } else {
         val
