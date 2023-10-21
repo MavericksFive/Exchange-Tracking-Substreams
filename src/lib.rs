@@ -22,16 +22,16 @@ fn map_exchanges(blk: eth::Block) -> Result<Option<StableSwap::Exchanges>, subst
         .events::<abi::stable_swap::events::TokenExchange>(&[&CONTRACT_ADDRESS])
         .map(|(exchange, log)| {
             substreams::log::info!("Token Exchange seen");
-             
+
             StableSwap::Exchange {
                 buyer: Some(StableSwap::Account {
                     address: append_0x(Hex::encode(&exchange.buyer).to_string().as_str()),}),
                 sold_id: ((&exchange.sold_id).to_string()).to_string(),
-                tokens_sold: to_big_decimal(&exchange.tokens_sold.to_string().as_str(), decimals_per_token_id(&exchange.tokens_sold))
+                tokens_sold: to_big_decimal(&exchange.tokens_sold.to_string().as_str(), decimals_per_token_id(&exchange.sold_id))
                 .unwrap()
                 .to_string(),
                 bought_id: ((&exchange.bought_id).to_string()).to_string(),
-                tokens_bought: to_big_decimal(&exchange.tokens_bought.to_string().as_str(), decimals_per_token_id(&exchange.tokens_bought))
+                tokens_bought: to_big_decimal(&exchange.tokens_bought.to_string().as_str(), decimals_per_token_id(&exchange.bought_id))
                 .unwrap()
                 .to_string(),
                 trx_hash: append_0x(&Hex::encode(&log.receipt.transaction.hash)),

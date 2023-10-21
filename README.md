@@ -12,6 +12,14 @@ Make sure you have the latest versions of the following installed:
 - [graph-cli](https://thegraph.com/docs/en/cookbook/quick-start/#2-install-the-graph-cli)
 - [substreams-cli](https://substreams.streamingfast.io/getting-started/installing-the-cli)
 
+
+### 0. Export the STREAMINGFAST_API_KEY
+
+```bash
+    export STREAMINGFAST_KEY=server_123123 # Use your own API key
+    export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
+```
+
 ### 1. Update the `CONTRACT_ADDRESS` & `START_BLOCK` variables in `src/utils/constants.rs`
 
 ```rust
